@@ -42,10 +42,6 @@ func fileExists(filename string) bool {
 
 func NewFileStorage(filename string) *FileStorage {
 
-	if !fileExists(filename) {
-		ioutil.WriteFile(filename, []byte("{}"), 0644)
-	}
-
 	return &FileStorage{
 		filename: filename,
 	}
@@ -55,6 +51,9 @@ func (f *FileStorage) GetItem(key string) string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
+	if !fileExists(f.filename) {
+		ioutil.WriteFile(f.filename, []byte("{}"), 0644)
+	}
 	data, err := ioutil.ReadFile(f.filename)
 	if err != nil {
 		return "null"
@@ -74,6 +73,9 @@ func (f *FileStorage) SetItem(key string, value string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if !fileExists(f.filename) {
+		ioutil.WriteFile(f.filename, []byte("{}"), 0644)
+	}
 	data, err := ioutil.ReadFile(f.filename)
 	if err != nil {
 		return
