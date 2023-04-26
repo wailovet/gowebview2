@@ -170,15 +170,6 @@ func getFreePort() int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-//go:embed static/vue.js
-var vueJs string
-
-//go:embed static/jquery.js
-var jqueryJs string
-
-//go:embed static/right-menu.js
-var rightMenuJs string
-
 //go:embed static/ajaxhook.min.js
 var ajaxhookJs string
 
