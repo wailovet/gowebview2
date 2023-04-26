@@ -346,6 +346,10 @@ func (f *AppMode) Run(args AppModeConfig) {
 
 	f.InitEnvironment(w, args.GlobalVariable)
 	w.Init(initJs)
+	for _, v := range args.InitJsFiles {
+		initJsSrc, _ := ioutil.ReadFile(v)
+		w.Init(string(initJsSrc))
+	}
 	w.Navigate(fmt.Sprintf("http://127.0.0.1:%d/index.html", freePort))
 	w.Run()
 }
