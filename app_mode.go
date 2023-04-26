@@ -13,8 +13,6 @@ import (
 	"sync"
 
 	_ "embed"
-
-	"github.com/spf13/cast"
 )
 
 type StorageInfterface interface {
@@ -172,9 +170,6 @@ func getFreePort() int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-//go:embed init.js
-var initJs string
-
 //go:embed static/vue.js
 var vueJs string
 
@@ -183,6 +178,9 @@ var jqueryJs string
 
 //go:embed static/right-menu.js
 var rightMenuJs string
+
+//go:embed static/ajaxhook.min.js
+var ajaxhookJs string
 
 func writeContentType(w http.ResponseWriter, path string) {
 
@@ -267,7 +265,6 @@ func (f *AppMode) startUpHTTP() (*http.Server, int) {
 			return nil
 		})
 
-		// http.Handle("/", http.FileServer(http.FS(fss)))
 	} else {
 		fs := http.FileServer(http.Dir(f.loadAppFilename))
 		http.Handle("/", fs)
@@ -286,43 +283,43 @@ func (f *AppMode) SetStorage(storage StorageInfterface) {
 	f.storage = storage
 }
 
-func (f *AppMode) InitEnvironment(w WebView, args map[string]string) {
-	if f.storage == nil {
-		f.storage = NewFileStorage("storage.json")
-	}
-	w.Bind("storageGetItem", f.storage.GetItem)
-	w.Bind("storageSetItem", f.storage.SetItem)
-	w.Bind("storageRemoveItem", f.storage.RemoveItem)
-	w.Bind("storageClear", f.storage.Clear)
-
-	jsSrc := initJs + "\n"
+func (f *AppMode) InitEnvironment(w WebView, args map[string]interface{}) {
+	jsSrc := ajaxhookJs + "\n\n"
 	for k, v := range args {
-		jsSrc = jsSrc + fmt.Sprintf("window.%s = '%s';", k, v)
+		val, _ := json.Marshal(v)
+		jsSrc = jsSrc + fmt.Sprintf("window.%s = %s;", k, string(val))
 	}
-
 	w.Init(jsSrc)
 }
 
-func (f *AppMode) Run(args map[string]string) {
+type AppModeConfig struct {
+	Width          uint
+	Height         uint
+	Title          string
+	Debug          bool
+	InitJsSrc      string
+	InitJsFiles    []string
+	Hint           string
+	GlobalVariable map[string]interface{}
+}
+
+func (f *AppMode) Run(args AppModeConfig) {
 	server, freePort := f.startUpHTTP()
 
-	if args == nil {
-		args = map[string]string{}
-	}
-
-	width := uint(cast.ToInt(args["width"]))
+	width := args.Width
 	if width == 0 {
 		width = 1080
 	}
 
-	height := uint(cast.ToInt(args["height"]))
+	height := args.Height
 	if height == 0 {
 		height = 860
 	}
 
-	debug := cast.ToBool(args["debug"])
+	debug := args.Debug
+	initJs := args.InitJsSrc
 
-	title := args["title"]
+	title := args.Title
 
 	w := NewWithOptions(WebViewOptions{
 		Debug:     debug,
@@ -345,7 +342,7 @@ func (f *AppMode) Run(args map[string]string) {
 	}()
 	w.SetTitle(title)
 
-	switch args["hint"] {
+	switch args.Hint {
 	case "fixed":
 		w.SetSize(int(width), int(height), HintFixed)
 	case "min":
@@ -356,7 +353,8 @@ func (f *AppMode) Run(args map[string]string) {
 		w.SetSize(int(width), int(height), HintNone)
 	}
 
-	f.InitEnvironment(w, map[string]string{})
+	f.InitEnvironment(w, args.GlobalVariable)
+	w.Init(initJs)
 	w.Navigate(fmt.Sprintf("http://127.0.0.1:%d/index.html", freePort))
 	w.Run()
 }
