@@ -173,6 +173,9 @@ func getFreePort() int {
 //go:embed static/ajaxhook.min.js
 var ajaxhookJs string
 
+//go:embed static/localStorage.js
+var localStorageJs string
+
 func writeContentType(w http.ResponseWriter, path string) {
 
 	if strings.HasSuffix(path, ".js") {
@@ -261,6 +264,27 @@ func (f *AppMode) startUpHTTP() (*http.Server, int) {
 		http.Handle("/", fs)
 	}
 
+	http.HandleFunc("/localStorage/getItem", func(w http.ResponseWriter, r *http.Request) {
+		key := r.URL.Query().Get("key")
+		val := f.storage.GetItem(key)
+		data := map[string]interface{}{
+			"data": val,
+		}
+		vals, _ := json.Marshal(data)
+		w.Write([]byte(vals))
+	})
+
+	http.HandleFunc("/localStorage/setItem", func(w http.ResponseWriter, r *http.Request) {
+		key := r.URL.Query().Get("key")
+		val := r.URL.Query().Get("value")
+		f.storage.SetItem(key, val)
+	})
+
+	http.HandleFunc("/localStorage/removeItem", func(w http.ResponseWriter, r *http.Request) {
+		key := r.URL.Query().Get("key")
+		f.storage.RemoveItem(key)
+	})
+
 	server := &http.Server{
 		Addr: fmt.Sprintf("localhost:%d", freePort),
 	}
@@ -343,8 +367,11 @@ func (f *AppMode) Run(args AppModeConfig) {
 	case "none":
 		w.SetSize(int(width), int(height), HintNone)
 	}
-
+	if f.storage != nil {
+		w.Init(fmt.Sprintf(localStorageJs, freePort, freePort, freePort))
+	}
 	f.InitEnvironment(w, args.GlobalVariable)
+
 	w.Init(initJs)
 	for _, v := range args.InitJsFiles {
 		initJsSrc, _ := ioutil.ReadFile(v)
